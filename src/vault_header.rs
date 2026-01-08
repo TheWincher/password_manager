@@ -5,7 +5,7 @@ use subtle::ConstantTimeEq;
 pub struct VaultHeader {
     magic: [u8; 4],
     version: u16,
-    pub salt: [u8; 16],
+    pub salt: [u8; 22],
     pub verifier: [u8; 32],
     none: [u8; 12],
 
@@ -17,7 +17,7 @@ pub struct VaultHeader {
 }
 
 impl VaultHeader {
-    pub fn new(salt: [u8; 16], verifier: [u8; 32]) -> Self {
+    pub fn new(salt: [u8; 22], verifier: [u8; 32]) -> Self {
         Self {
             magic: b"PMGR".to_owned(), version: 1, salt: salt, verifier: verifier, none: b"000000000000".to_owned()
         }
@@ -48,7 +48,7 @@ impl VaultHeader {
             return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid version"));
         }
         
-        let mut salt = [0u8; 16];
+        let mut salt = [0u8; 22];
         reader.read_exact(&mut salt)?;
 
         let mut verifier = [0u8; 32];

@@ -6,7 +6,7 @@ use std::sync::OnceLock;
 use std::path::Path;
 
 use crate::key_derivation::{create_verifier, derive_key, verify_password};
-use crate::vault_header::{self, VaultHeader};
+use crate::vault_header::{VaultHeader};
 
 
 struct VaultEntry {}
