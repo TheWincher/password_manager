@@ -17,6 +17,12 @@ pub struct VaultHeader {
 }
 
 impl VaultHeader {
+    pub fn new(salt: [u8; 16], verifier: [u8; 32]) -> Self {
+        Self {
+            magic: b"PMGR".to_owned(), version: 1, salt: salt, verifier: verifier, none: b"000000000000".to_owned()
+        }
+    }
+
     pub fn write<W: Write>(&self, mut writer: W) -> std::io::Result<()> {
         writer.write_all(self.magic.as_slice())?;
         writer.write_all(self.version.to_le_bytes().as_slice())?;

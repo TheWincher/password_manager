@@ -5,15 +5,15 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::path::Path;
 
-use crate::key_derivation::verify_password;
-use crate::vault_header::VaultHeader;
+use crate::key_derivation::{create_verifier, derive_key, verify_password};
+use crate::vault_header::{self, VaultHeader};
 
 
 struct VaultEntry {}
 
 static DEFAULT_VAULT_PATH: OnceLock<PathBuf> = OnceLock::new();
 
-pub fn vault_path() -> &'static PathBuf {
+fn vault_path() -> &'static PathBuf {
     DEFAULT_VAULT_PATH.get_or_init(|| {
         #[cfg(target_os = "windows")]
         {
@@ -48,7 +48,19 @@ pub struct Vault {
 }
 
 impl Vault {
-    // pub fn new(master_password: &str) -> Result<Self, std::io::Error> {}
+    pub fn new(master_password: &str) -> Result<Self, std::io::Error> {
+        let (derive_key, salt) = derive_key(master_password);
+        let verifier = create_verifier(&derive_key);
+
+        let vault_header = VaultHeader::new(salt, verifier);
+        let file = File::create(vault_path())?;
+        vault_header.write(file)?;
+
+        Ok(Vault {
+            header: vault_header,
+            entries: Vec::new(),
+        })
+    }
     
     pub fn open_existing(master_password: &str) -> Result<Self, std::io::Error> {
         let file = File::open(vault_path())?;
