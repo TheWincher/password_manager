@@ -7,8 +7,7 @@ pub struct VaultHeader {
     version: u16,
     pub salt: [u8; 22],
     pub verifier: [u8; 32],
-    none: [u8; 12],
-
+    pub none: [u8; 12],
     /*
     uint8_t kdf;
     uint32_t opsLimit;
@@ -17,9 +16,13 @@ pub struct VaultHeader {
 }
 
 impl VaultHeader {
-    pub fn new(salt: [u8; 22], verifier: [u8; 32]) -> Self {
+    pub fn new(salt: [u8; 22], verifier: [u8; 32], none: [u8; 12]) -> Self {
         Self {
-            magic: b"PMGR".to_owned(), version: 1, salt: salt, verifier: verifier, none: b"000000000000".to_owned()
+            magic: b"PMGR".to_owned(),
+            version: 1,
+            salt: salt,
+            verifier: verifier,
+            none: none,
         }
     }
 
@@ -38,16 +41,22 @@ impl VaultHeader {
         reader.read_exact(&mut magic)?;
 
         if magic.ct_ne(b"PMGR").unwrap_u8() == 1 {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid magic"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Invalid magic",
+            ));
         }
 
         let mut version = [0u8; 2];
         reader.read_exact(&mut version)?;
 
         if u16::from_le_bytes(version) != 1 {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid version"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Invalid version",
+            ));
         }
-        
+
         let mut salt = [0u8; 22];
         reader.read_exact(&mut salt)?;
 
@@ -57,6 +66,12 @@ impl VaultHeader {
         let mut none = [0u8; 12];
         reader.read_exact(&mut none)?;
 
-        Ok(Self { magic, version: u16::from_le_bytes(version), salt, verifier, none })
+        Ok(Self {
+            magic,
+            version: u16::from_le_bytes(version),
+            salt,
+            verifier,
+            none,
+        })
     }
 }
