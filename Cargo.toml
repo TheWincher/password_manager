@@ -1,0 +1,11 @@
+[package]
+name = "password-manager"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+argon2 = "0.5.3"
+rand = "0.8"
+hmac = "0.12.1"
+sha2 = "0.10"
+subtle = "2.6"
