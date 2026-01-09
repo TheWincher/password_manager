@@ -147,7 +147,6 @@ impl Vault {
         let entries_count = _data[index] as usize;
         index += 1;
 
-        println!("Entries count: {}", entries_count);
         let mut entries = Vec::<VaultEntry>::new();
 
         for _ in 0..entries_count {
@@ -187,5 +186,9 @@ impl Vault {
 
     pub fn get_entries(&self) -> &Vec<VaultEntry> {
         &self.entries
+    }
+
+    pub fn get_entry(&self, index: usize) -> Option<&VaultEntry> {
+        self.entries.get(index).to_owned()
     }
 }

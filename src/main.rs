@@ -29,6 +29,8 @@ fn main() {
         println!("2. Lister les services");
         println!("3. Voir une entrée");
         println!("4. Quitter");
+        print!("Entrez votre choix: ");
+        stdout().flush().expect("error");
 
         let choice = &mut String::new();
         stdin.read_line(choice).expect("error");
@@ -68,12 +70,34 @@ fn main() {
             }
             2 => {
                 println!("Services :");
-                for entry in vault.get_entries() {
-                    println!("- {}", entry.service);
+                for (i, entry) in vault.get_entries().iter().enumerate() {
+                    println!("{}- {}", i, entry.service);
                 }
             }
             3 => {
-                println!("TODO: View an entry");
+                print!("Entrez le numéro souhaité : ");
+                stdout().flush().expect("err");
+
+                let entry_number_input = &mut String::new(); 
+                stdin.read_line(entry_number_input).expect("err");
+                let entry_number: usize = entry_number_input.trim().parse().expect("Input not an integer");
+
+                let entry = vault.get_entry(entry_number);
+                if entry.is_none() {
+                    println!("Entry not found");
+                    continue;
+                }
+
+                println!("Service : {}", entry.unwrap().service);
+                println!("Username : {}", entry.unwrap().username.clone().unwrap_or("".to_string()));
+                println!("Username : {}", String::from_utf8_lossy(&entry.unwrap().password));
+                
+
+                print!("Username (optional) : ");
+                stdout().flush().expect("error");
+
+                print!("Password : ");
+                stdout().flush().expect("error");
             }
             4 => exit(0),
             _ => {

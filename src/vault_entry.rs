@@ -27,15 +27,12 @@ impl VaultEntry {
         let mut index = 0;
 
         let service_len = data[index] as usize;
-        println!("Service length: {}", service_len);
         index += 1;
 
         let service = String::from_utf8(data[index..index + service_len].to_vec()).unwrap();
-        println!("Service: {}", service);
         index += service_len;
 
         let username_len = data[index] as usize;
-        println!("Username length: {}", username_len);
         index += 1;
 
         let username = if username_len > 0 {
@@ -43,18 +40,12 @@ impl VaultEntry {
         } else {
             None
         };
-        println!("Username: {:?}", username);
+        index += username_len;
 
         let password_len = data[index] as usize;
-        println!("Password length: {}", password_len);
         index += 1;
 
         let password = data[index..index + password_len].to_vec();
-        println!(
-            "Password: {:?}, {}",
-            password,
-            String::from_utf8_lossy(&password)
-        );
 
         VaultEntry {
             service,
