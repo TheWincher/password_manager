@@ -1,7 +1,7 @@
-// mod key_derivation;
-// mod vault;
-// mod vault_entry;
-// mod vault_header;
+mod key_derivation;
+mod vault;
+mod vault_entry;
+mod vault_header;
 
 // use std::{
 //     io::{Write, stdin, stdout},
@@ -78,7 +78,7 @@
 //                 print!("Entrez le numéro souhaité : ");
 //                 stdout().flush().expect("err");
 
-//                 let entry_number_input = &mut String::new(); 
+//                 let entry_number_input = &mut String::new();
 //                 stdin.read_line(entry_number_input).expect("err");
 //                 let entry_number: usize = entry_number_input.trim().parse().expect("Input not an integer");
 
@@ -91,7 +91,6 @@
 //                 println!("Service : {}", entry.unwrap().service);
 //                 println!("Username : {}", entry.unwrap().username.clone().unwrap_or("".to_string()));
 //                 println!("Username : {}", String::from_utf8_lossy(&entry.unwrap().password));
-                
 
 //                 print!("Username (optional) : ");
 //                 stdout().flush().expect("error");
@@ -113,6 +112,6 @@ use crate::app::App;
 
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
-    ratatui::run(|terminal| App::default().run(terminal))?;
+    ratatui::run(|terminal| App::new().run(terminal))?;
     Ok(())
 }

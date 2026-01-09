@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct VaultEntry {
     pub service: String,
     pub username: Option<String>,

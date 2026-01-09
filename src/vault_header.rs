@@ -1,7 +1,8 @@
-use std::io::{Read, Write};
+use std::io::{ Read, Write };
 
 use subtle::ConstantTimeEq;
 
+#[derive(Debug)]
 pub struct VaultHeader {
     magic: [u8; 4],
     version: u16,
@@ -41,20 +42,14 @@ impl VaultHeader {
         reader.read_exact(&mut magic)?;
 
         if magic.ct_ne(b"PMGR").unwrap_u8() == 1 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Invalid magic",
-            ));
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid magic"));
         }
 
         let mut version = [0u8; 2];
         reader.read_exact(&mut version)?;
 
         if u16::from_le_bytes(version) != 1 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Invalid version",
-            ));
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid version"));
         }
 
         let mut salt = [0u8; 22];

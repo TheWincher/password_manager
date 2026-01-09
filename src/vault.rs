@@ -58,6 +58,7 @@ fn ensure_parents_exist() -> std::io::Result<()> {
     Ok(())
 }
 
+#[derive(Debug)]
 pub struct Vault {
     header: VaultHeader,
     entries: Vec<VaultEntry>,
@@ -84,15 +85,14 @@ impl Vault {
         let mut file = File::open(vault_path())?;
         let vault_header = VaultHeader::read(&file)?;
 
-        if !key_derivation::verify_password(
-            master_password,
-            &vault_header.salt,
-            &vault_header.verifier,
-        ) {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Invalid password",
-            ));
+        if
+            !key_derivation::verify_password(
+                master_password,
+                &vault_header.salt,
+                &vault_header.verifier
+            )
+        {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid password"));
         }
 
         let mut data = Vec::<u8>::new();
@@ -151,12 +151,13 @@ impl Vault {
 
         for _ in 0..entries_count {
             let entry = VaultEntry::deserialize(&_data[index..]);
-            index += 1
-                + entry.service.len()
-                + 1
-                + entry.username.as_ref().map_or(0, |u| u.len())
-                + 1
-                + entry.password.len();
+            index +=
+                1 +
+                entry.service.len() +
+                1 +
+                entry.username.as_ref().map_or(0, |u| u.len()) +
+                1 +
+                entry.password.len();
             entries.push(entry);
         }
 
