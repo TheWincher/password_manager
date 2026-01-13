@@ -1,14 +1,17 @@
-use std::{ fs::{ self, DirEntry, File }, io::{ self, Read, Write }, path::PathBuf };
-use crossterm::event::{ self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers };
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
-    DefaultTerminal,
-    Frame,
-    layout::{ Alignment, Constraint, Direction, Layout, Rect },
-    style::{ Color, Style },
-    widgets::{ Block, Borders, Clear, List, ListItem, ListState, Padding, Paragraph },
+    DefaultTerminal, Frame,
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Style},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState, Padding, Paragraph},
 };
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 use std::env;
+use std::{
+    fs::{self, DirEntry, File},
+    io::{self, Read, Write},
+    path::PathBuf,
+};
 
 use crate::vault::Vault;
 
@@ -19,6 +22,10 @@ enum AppState {
     AskMasterPassword,
     AskNewMasterPassword,
     VaultUncloked,
+    VaultAddEntry,
+    VaultShowEntry,
+    VaultEditEntry,
+    VaultDeleteEntry,
     Exit,
 }
 
@@ -70,6 +77,7 @@ pub struct App {
     input: InputState,
     ask_create_or_open_vault_state: AskCreateOrOpenVaultState,
     vault_selector_state: VaultSelectorState,
+    vault_unlock_state: VaultUnclokedState,
     vault: Option<Vault>,
     config: Option<Config>,
 }
@@ -98,6 +106,7 @@ impl App {
             config: config,
             ask_create_or_open_vault_state: AskCreateOrOpenVaultState::new(),
             vault_selector_state: VaultSelectorState::new(),
+            vault_unlock_state: VaultUnclokedState::new(),
         })
     }
 
@@ -125,7 +134,26 @@ impl App {
                 let rect = centered_rect(60, 5, frame.area());
                 Input::draw(frame, rect, &self.input);
             }
-            AppState::VaultUncloked => {}
+            AppState::VaultUncloked => {
+                VaultUncloked::draw(
+                    frame,
+                    &mut self.vault_unlock_state,
+                    self.vault.as_mut().unwrap(),
+                );
+            }
+            AppState::VaultAddEntry => {
+                VaultUncloked::draw(
+                    frame,
+                    &mut self.vault_unlock_state,
+                    self.vault.as_mut().unwrap(),
+                );
+
+                VaultAddEntry::draw(
+                    frame,
+                    &mut self.vault_unlock_state,
+                    self.vault.as_mut().unwrap(),
+                );
+            }
             _ => {}
         }
     }
@@ -145,21 +173,26 @@ impl App {
             KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.state = AppState::Exit;
             }
-            _ if self.state == AppState::AskCreateOrOpenVault =>
-                self.ask_create_or_open_vault_state.on_key(key_event.code, &mut self.state),
-            _ if self.state == AppState::SelectExistingVault =>
-                self.vault_selector_state.on_key(key_event.code, &mut self.state),
-            _ if
-                self.state == AppState::AskMasterPassword ||
-                self.state == AppState::AskNewMasterPassword
-            =>
+            _ if self.state == AppState::AskCreateOrOpenVault => self
+                .ask_create_or_open_vault_state
+                .on_key(key_event.code, &mut self.state),
+            _ if self.state == AppState::SelectExistingVault => self
+                .vault_selector_state
+                .on_key(key_event.code, &mut self.state),
+            _ if self.state == AppState::AskMasterPassword
+                || self.state == AppState::AskNewMasterPassword =>
+            {
                 self.input.on_key(
                     key_event.code,
                     &mut self.state,
                     &mut self.vault,
                     &self.vault_selector_state,
-                    &mut self.config
-                ),
+                    &mut self.config,
+                )
+            }
+            _ if self.state == AppState::VaultUncloked => self
+                .vault_unlock_state
+                .on_key(key_event.code, &mut self.state),
             _ => {}
         }
     }
@@ -194,7 +227,9 @@ impl AskCreateOrOpenVaultState {
     fn new() -> Self {
         let mut list_state = ListState::default();
         list_state.select(Some(0));
-        Self { list_state: list_state }
+        Self {
+            list_state: list_state,
+        }
     }
 
     pub fn on_key(&mut self, key: KeyCode, state: &mut AppState) {
@@ -226,21 +261,23 @@ impl AskCreateOrOpenVault {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(3), // header
-                Constraint::Min(5), // content
+                Constraint::Min(5),    // content
                 Constraint::Length(2), // footer
             ])
             .split(frame.area());
 
         // Header
         frame.render_widget(
-            Block::default().title(" Password Manager ─ Initialisation ").borders(Borders::ALL),
-            layout[0]
+            Block::default()
+                .title(" Password Manager ─ Initialisation ")
+                .borders(Borders::ALL),
+            layout[0],
         );
 
         // Content
         let items = vec![
             ListItem::new("Créer un nouveau vault"),
-            ListItem::new("Ouvrir un vault existant")
+            ListItem::new("Ouvrir un vault existant"),
         ];
 
         let list = List::new(items)
@@ -253,7 +290,7 @@ impl AskCreateOrOpenVault {
         // Footer
         frame.render_widget(
             Paragraph::new("↑↓/jk Naviguer • Entrer Valider • q Quitter"),
-            layout[2]
+            layout[2],
         );
     }
 }
@@ -273,12 +310,16 @@ impl VaultSelectorState {
         let mut list_state = ListState::default();
         list_state.select(Some(0));
 
-        Self { current_dir: dir, entries: entries, list_state: list_state, file_selected: None }
+        Self {
+            current_dir: dir,
+            entries: entries,
+            list_state: list_state,
+            file_selected: None,
+        }
     }
 
     fn read_dir(path: &PathBuf) -> Vec<DirEntry> {
-        let mut entries: Vec<_> = fs
-            ::read_dir(path)
+        let mut entries: Vec<_> = fs::read_dir(path)
             .unwrap()
             .filter_map(Result::ok)
             .filter(|item| {
@@ -287,8 +328,8 @@ impl VaultSelectorState {
                     return false;
                 }
 
-                file_type.as_ref().unwrap().is_dir() ||
-                    (file_type.unwrap().is_file() && item.file_name() == "vault.bin")
+                file_type.as_ref().unwrap().is_dir()
+                    || (file_type.unwrap().is_file() && item.file_name() == "vault.bin")
             })
             .collect();
 
@@ -336,18 +377,21 @@ impl VaultSelector {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(3), // header
-                Constraint::Min(5), // content
+                Constraint::Min(5),    // content
                 Constraint::Length(2), // footer
             ])
             .split(frame.area());
 
         // Header
         frame.render_widget(
-            Block::default().title(" Password Manager ─ Select Vault File").borders(Borders::ALL),
-            layout[0]
+            Block::default()
+                .title(" Password Manager ─ Select Vault File")
+                .borders(Borders::ALL),
+            layout[0],
         );
 
-        let items: Vec<ListItem> = state.entries
+        let items: Vec<ListItem> = state
+            .entries
             .iter()
             .map(|e| {
                 let name = e.file_name().to_string_lossy().to_string();
@@ -356,7 +400,11 @@ impl VaultSelector {
             .collect();
 
         let list = List::new(items)
-            .block(Block::default().title("Select vault file").borders(Borders::ALL))
+            .block(
+                Block::default()
+                    .title("Select vault file")
+                    .borders(Borders::ALL),
+            )
             .highlight_style(Style::default().bg(Color::Blue))
             .highlight_symbol("> ");
 
@@ -365,7 +413,7 @@ impl VaultSelector {
         // Footer
         frame.render_widget(
             Paragraph::new("↑↓/jk Naviguer • Entrer Valider • q Quitter"),
-            layout[2]
+            layout[2],
         );
     }
 }
@@ -390,7 +438,7 @@ impl InputState {
         state: &mut AppState,
         vault: &mut Option<Vault>,
         vault_selector_state: &VaultSelectorState,
-        config: &mut Option<Config>
+        config: &mut Option<Config>,
     ) {
         match key {
             KeyCode::Char(c) => {
@@ -415,14 +463,22 @@ impl InputState {
         state: &mut AppState,
         vault: &mut Option<Vault>,
         vault_selector_state: &VaultSelectorState,
-        config: &mut Option<Config>
+        config: &mut Option<Config>,
     ) {
-        let vault_path = vault_selector_state.file_selected.as_ref().unwrap();
+        let default_vault_path = get_path(FileType::Vault);
+        let vault_path = vault_selector_state.file_selected.as_ref();
         if *state == AppState::AskMasterPassword {
             let v = Vault::open_existing(
-                vault_selector_state.file_selected.as_ref().unwrap(),
-                &self.value
-            ).unwrap();
+                if vault_path.is_some() {
+                    vault_path.unwrap()
+                } else if config.is_some() {
+                    &config.as_ref().unwrap().vault_path
+                } else {
+                    &default_vault_path
+                },
+                &self.value,
+            )
+            .unwrap();
 
             *vault = Some(v);
             *state = AppState::VaultUncloked;
@@ -432,12 +488,18 @@ impl InputState {
             *state = AppState::VaultUncloked;
         }
 
+        let binding = get_path(FileType::Vault);
+        let vault_path_2 = vault_path.unwrap_or(&binding);
         self.value.clear();
         if config.is_none() {
-            let new_config = Config { vault_path: vault_path.to_path_buf() };
+            let new_config = Config {
+                vault_path: vault_path_2.to_path_buf(),
+            };
             *config = Some(new_config);
         } else {
-            config.take().unwrap().vault_path = vault_path.to_path_buf();
+            let mut old_config = config.take().unwrap();
+            old_config.vault_path = vault_path_2.to_path_buf();
+            *config = Some(old_config);
         }
 
         let config_path = get_path(FileType::Config);
@@ -474,4 +536,114 @@ impl Input {
 
         f.set_cursor_position((x, y));
     }
+}
+
+#[derive(Debug)]
+struct VaultUnclokedState {
+    list_state: ListState,
+}
+
+impl VaultUnclokedState {
+    fn new() -> Self {
+        let mut list_state = ListState::default();
+        list_state.select(Some(0));
+        Self { list_state }
+    }
+
+    fn on_key(&mut self, key: KeyCode, state: &mut AppState) {
+        match key {
+            KeyCode::Down | KeyCode::Char('j') => self.list_state.select_next(),
+            KeyCode::Up | KeyCode::Char('k') => self.list_state.select_previous(),
+            KeyCode::Char('a') => *state = AppState::VaultAddEntry,
+            //KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => self.enter(state),
+            _ => {}
+        }
+    }
+}
+
+struct VaultUncloked;
+impl VaultUncloked {
+    fn draw(frame: &mut Frame, state: &mut VaultUnclokedState, vault: &mut Vault) {
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3), // header
+                Constraint::Min(5),    // content
+                Constraint::Length(2), // footer
+            ])
+            .split(frame.area());
+
+        // Header
+        frame.render_widget(
+            Block::default()
+                .title(" Password Manager ─ Vault")
+                .borders(Borders::ALL),
+            layout[0],
+        );
+
+        let items: Vec<ListItem> = vault
+            .get_entries()
+            .iter()
+            .map(|e| ListItem::new(e.service.clone()))
+            .collect();
+
+        let list = List::new(items)
+            .block(Block::default().title("Entries").borders(Borders::ALL))
+            .highlight_style(Style::default().bg(Color::Blue))
+            .highlight_symbol("> ");
+
+        frame.render_stateful_widget(list, layout[1], &mut state.list_state);
+
+        // Footer
+        frame.render_widget(
+            Paragraph::new("↑↓/jk Naviguer • Entrer Valider • q Quitter • a Ajouter"),
+            layout[2],
+        );
+    }
+}
+
+#[derive(Debug)]
+struct VaultAddEntry;
+impl VaultAddEntry {
+    fn draw(frame: &mut Frame, state: &mut VaultUnclokedState, vault: &mut Vault) {
+        let rect = centered_rect(60, 60, frame.area());
+        frame.render_widget(Clear, rect);
+
+        let block = Block::default()
+            .title("Ajouter une entrée")
+            .borders(Borders::ALL)
+            .padding(Padding::horizontal(1));
+
+        frame.render_widget(block, rect);
+
+        let rec_1 = centered_rect(90, 5, rect);
+        let block = Block::default()
+            .title("Service")
+            .borders(Borders::ALL)
+            .padding(Padding::horizontal(1));
+
+        let paragraph = Paragraph::new("test")
+            .block(block)
+            .alignment(Alignment::Left);
+
+        frame.render_widget(paragraph, rec_1);
+    }
+}
+
+#[derive(Debug)]
+struct VaultShowEntry;
+impl VaultShowEntry {
+    fn draw(frame: &mut Frame, state: &mut VaultUnclokedState, vault: &mut Vault) {}
+}
+
+#[derive(Debug)]
+struct VaultEditEntry;
+impl VaultEditEntry {
+    fn draw(frame: &mut Frame, state: &mut VaultUnclokedState, vault: &mut Vault) {}
+}
+
+#[derive(Debug)]
+struct VaultDeleteEntry;
+impl VaultDeleteEntry {
+    fn draw(frame: &mut Frame, state: &mut VaultUnclokedState, vault: &mut Vault) {}
 }
