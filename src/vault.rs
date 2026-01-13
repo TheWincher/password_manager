@@ -81,8 +81,8 @@ impl Vault {
         Ok(vault)
     }
 
-    pub fn open_existing(master_password: &str) -> Result<Self, std::io::Error> {
-        let mut file = File::open(vault_path())?;
+    pub fn open_existing(path: &PathBuf, master_password: &str) -> Result<Self, std::io::Error> {
+        let mut file = File::open(path)?;
         let vault_header = VaultHeader::read(&file)?;
 
         if
