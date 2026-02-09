@@ -3,6 +3,7 @@ mod vault;
 mod vault_entry;
 mod vault_header;
 mod app;
+mod ui;
 
 use crate::app::App;
 
